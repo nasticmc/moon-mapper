@@ -3,6 +3,7 @@ const moonSurface = document.getElementById('moonSurface');
 const form = document.getElementById('poiForm');
 const poiList = document.getElementById('poiList');
 const template = document.getElementById('poiTemplate');
+const syncStatus = document.getElementById('syncStatus');
 
 const zoomLabel = document.getElementById('zoomLabel');
 const zoomInBtn = document.getElementById('zoomIn');
@@ -12,7 +13,7 @@ const resetViewBtn = document.getElementById('resetView');
 const poiLatInput = document.getElementById('poiLat');
 const poiLonInput = document.getElementById('poiLon');
 
-let pois = loadPOIs();
+let pois = [];
 let viewState = { scale: 1, offsetX: 0, offsetY: 0 };
 let dragState = null;
 
@@ -28,16 +29,31 @@ function percentToLatLon(x, y) {
   return { lat: Number(lat.toFixed(1)), lon: Number(lon.toFixed(1)) };
 }
 
-function loadPOIs() {
-  try {
-    return JSON.parse(localStorage.getItem('moon-pois') || '[]');
-  } catch {
-    return [];
+async function fetchPOIsFromServer() {
+  const response = await fetch('/api/pois');
+  if (!response.ok) {
+    throw new Error(`Unable to load POIs (${response.status})`);
+  }
+  const data = await response.json();
+  return Array.isArray(data.pois) ? data.pois : [];
+}
+
+async function savePOIToServer(poi) {
+  const response = await fetch('/api/pois', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(poi)
+  });
+
+  if (!response.ok) {
+    throw new Error(`Unable to save POI (${response.status})`);
   }
 }
 
-function savePOIs() {
-  localStorage.setItem('moon-pois', JSON.stringify(pois));
+function setStatus(message, variant = 'neutral') {
+  if (!syncStatus) return;
+  syncStatus.textContent = message;
+  syncStatus.dataset.variant = variant;
 }
 
 function applyView() {
@@ -149,7 +165,7 @@ form.addEventListener('submit', async (event) => {
 
   const files = await filesToPayload(document.getElementById('poiFiles').files);
 
-  pois.unshift({
+  const poi = {
     id: crypto.randomUUID(),
     name,
     description,
@@ -157,11 +173,18 @@ form.addEventListener('submit', async (event) => {
     lon,
     links,
     files
-  });
+  };
 
-  savePOIs();
-  renderPOIList();
-  form.reset();
+  try {
+    setStatus('Saving to server...', 'neutral');
+    await savePOIToServer(poi);
+    pois = await fetchPOIsFromServer();
+    renderPOIList();
+    form.reset();
+    setStatus(`Synced ${pois.length} POIs from server`, 'ok');
+  } catch {
+    setStatus('Failed to save POI to server', 'error');
+  }
 });
 
 function updateScale(nextScale) {
@@ -209,5 +232,17 @@ moonSurface.addEventListener('click', (event) => {
   poiLonInput.value = String(lon);
 });
 
-applyView();
-renderPOIList();
+async function init() {
+  applyView();
+  setStatus('Loading POIs from server...', 'neutral');
+  try {
+    pois = await fetchPOIsFromServer();
+    renderPOIList();
+    setStatus(`Synced ${pois.length} POIs from server`, 'ok');
+  } catch {
+    setStatus('Unable to load shared POIs from server', 'error');
+    poiList.innerHTML = '<p>Server unavailable. Start server.js to use shared data.</p>';
+  }
+}
+
+init();

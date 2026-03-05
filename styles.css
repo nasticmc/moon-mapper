@@ -111,6 +111,16 @@ button:hover { filter: brightness(1.1); }
 }
 
 .hint { text-align: center; color: var(--muted); font-size: 0.9rem; }
+.sync-status {
+  text-align: center;
+  margin: 0.4rem 0 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.sync-status[data-variant="ok"] { color: #6df0c2; }
+.sync-status[data-variant="error"] { color: #ff89a0; }
+
 
 .card {
   background: var(--panel);
