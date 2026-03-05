@@ -4,8 +4,8 @@ Moon Mapper is a single-page lunar exploration app where all points of interest 
 
 ## Features
 
-- **High-resolution moon imagery basemap** (8K lunar photo texture) with animated spin/rotation controls.
-- **Interactive moon map** with zoom, wheel zoom, drag-to-pan, and reset.
+- **High-resolution moon imagery basemap** (4K equirectangular lunar photo map loaded from the web) with animated spin/rotation controls.
+- **Interactive moon map** with zoom, wheel zoom, drag-to-reposition, and reset.
 - **Click-to-prefill coordinates** for fast marker placement.
 - **POI form** with name, description, lat/lon, links, and file attachments.
 - **Server-side persistence** in `data/pois.json` shared across clients.
@@ -56,4 +56,4 @@ http://192.168.1.42:4173
 
 ## Imagery attribution
 
-- Lunar basemap: [Solar System Scope moon textures](https://www.solarsystemscope.com/textures/).
+- Lunar basemap: [Celestia Project moon texture](https://github.com/CelestiaProject/CelestiaContent/blob/master/textures/hires/moon.jpg).
