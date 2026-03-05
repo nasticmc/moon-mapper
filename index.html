@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Moon Mapper</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <section class="viewer-panel">
+        <header class="panel-header">
+          <h1>🌕 Moon Mapper</h1>
+          <p>Drop custom points of interest, attach files, and explore the lunar surface.</p>
+        </header>
+
+        <div class="controls">
+          <button id="zoomIn" type="button">＋ Zoom In</button>
+          <button id="zoomOut" type="button">－ Zoom Out</button>
+          <button id="rotateLeft" type="button">⟲ Rotate Left</button>
+          <button id="rotateRight" type="button">⟳ Rotate Right</button>
+          <button id="toggleSpin" type="button">Pause Spin</button>
+          <button id="resetView" type="button">Reset View</button>
+          <span id="zoomLabel">100%</span>
+        </div>
+
+        <div class="surface-shell" id="surfaceShell">
+          <div class="moon-surface" id="moonSurface" aria-label="Interactive moon surface"></div>
+        </div>
+
+        <p class="hint">Tip: click to prefill coordinates. Use rotate controls for real lunar imagery rotation.</p>
+        <p class="surface-credit">Moon basemap: <a href="https://commons.wikimedia.org/wiki/File:Whole_moon_surface_topography_by_LRO_and_LOLA.jpg" target="_blank" rel="noreferrer noopener">LRO/LOLA global lunar topography</a>.</p>
+        <p id="syncStatus" class="sync-status" aria-live="polite"></p>
+      </section>
+
+      <aside class="sidebar">
+        <section class="card">
+          <h2>Add Point of Interest</h2>
+          <form id="poiForm">
+            <label>
+              Name
+              <input type="text" id="poiName" required placeholder="e.g. Tycho Crater" />
+            </label>
+            <label>
+              Description
+              <textarea id="poiDescription" rows="3" placeholder="Why this location matters"></textarea>
+            </label>
+            <div class="coord-grid">
+              <label>
+                Latitude
+                <input type="number" id="poiLat" min="-90" max="90" step="0.1" required />
+              </label>
+              <label>
+                Longitude
+                <input type="number" id="poiLon" min="-180" max="180" step="0.1" required />
+              </label>
+            </div>
+            <label>
+              Upload images/materials
+              <input type="file" id="poiFiles" accept="image/*,.pdf,.txt,.md,.doc,.docx" multiple />
+            </label>
+            <label>
+              Resource links (comma-separated)
+              <input type="text" id="poiLinks" placeholder="https://... , https://..." />
+            </label>
+            <button type="submit">Add POI</button>
+          </form>
+        </section>
+
+        <section class="card">
+          <h2>Points of Interest</h2>
+          <div id="poiList" class="poi-list"></div>
+        </section>
+      </aside>
+    </main>
+
+    <template id="poiTemplate">
+      <article class="poi-card">
+        <h3></h3>
+        <p class="poi-desc"></p>
+        <p class="poi-coords"></p>
+        <div class="poi-links"></div>
+        <div class="poi-files"></div>
+      </article>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>
