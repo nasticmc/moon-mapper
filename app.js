@@ -1,3 +1,4 @@
+const surfaceStage = document.getElementById('surfaceStage');
 const surfaceShell = document.getElementById('surfaceShell');
 const moonSurface = document.getElementById('moonSurface');
 const form = document.getElementById('poiForm');
@@ -17,7 +18,7 @@ const poiLatInput = document.getElementById('poiLat');
 const poiLonInput = document.getElementById('poiLon');
 
 let pois = [];
-let viewState = { scale: 1, offsetX: 0, offsetY: 0, rotation: 0 };
+let viewState = { scale: 1, rotation: 0, moonX: 0, moonY: 0 };
 let dragState = null;
 let spinState = { enabled: true, rafId: null, lastTs: 0 };
 
@@ -65,9 +66,11 @@ function setStatus(message, variant = 'neutral') {
 }
 
 function applyView() {
-  const { scale, offsetX, offsetY, rotation } = viewState;
-  moonSurface.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+  const { scale, rotation, moonX, moonY } = viewState;
+  moonSurface.style.transform = `scale(${scale})`;
   moonSurface.style.backgroundPosition = `${50 + rotation / 3.6}% center`;
+  surfaceShell.style.setProperty('--moon-x', `${moonX}px`);
+  surfaceShell.style.setProperty('--moon-y', `${moonY}px`);
   zoomLabel.textContent = `${Math.round(scale * 100)}%`;
   renderPOIDots();
 }
@@ -220,7 +223,7 @@ rotateLeftBtn.addEventListener('click', () => updateRotation(-12));
 rotateRightBtn.addEventListener('click', () => updateRotation(12));
 spinToggleBtn.addEventListener('click', () => setSpin(!spinState.enabled));
 resetViewBtn.addEventListener('click', () => {
-  viewState = { scale: 1, offsetX: 0, offsetY: 0, rotation: 0 };
+  viewState = { scale: 1, rotation: 0, moonX: 0, moonY: 0 };
   applyView();
 });
 
@@ -239,8 +242,11 @@ surfaceShell.addEventListener('pointermove', (event) => {
   const dx = event.clientX - dragState.x;
   const dy = event.clientY - dragState.y;
   dragState = { x: event.clientX, y: event.clientY };
-  viewState.offsetX += dx;
-  viewState.offsetY += dy;
+
+  const bounds = surfaceStage.getBoundingClientRect();
+  const maxOffset = Math.max(0, (bounds.width - surfaceShell.offsetWidth) / 2);
+  viewState.moonX = Math.max(-maxOffset, Math.min(maxOffset, viewState.moonX + dx));
+  viewState.moonY = Math.max(-maxOffset, Math.min(maxOffset, viewState.moonY + dy));
   applyView();
 });
 
