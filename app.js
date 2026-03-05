@@ -66,8 +66,10 @@ function setStatus(message, variant = 'neutral') {
 
 function applyView() {
   const { scale, offsetX, offsetY, rotation } = viewState;
-  moonSurface.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
-  moonSurface.style.backgroundPosition = `${50 + rotation / 3.6}% center`;
+  surfaceShell.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
+  moonSurface.style.transform = `scale(${scale})`;
+  const wrappedRotation = ((rotation % 360) + 360) % 360;
+  moonSurface.style.backgroundPosition = `${50 + wrappedRotation / 3.6}% center`;
   zoomLabel.textContent = `${Math.round(scale * 100)}%`;
   renderPOIDots();
 }
@@ -188,7 +190,7 @@ function updateScale(nextScale) {
 }
 
 function updateRotation(delta) {
-  viewState.rotation = normalizeLon(viewState.rotation + delta);
+  viewState.rotation += delta;
   applyView();
 }
 
@@ -244,7 +246,12 @@ surfaceShell.addEventListener('pointermove', (event) => {
   applyView();
 });
 
-surfaceShell.addEventListener('pointerup', () => {
+surfaceShell.addEventListener('pointerup', (event) => {
+  dragState = null;
+  if (surfaceShell.hasPointerCapture(event.pointerId)) surfaceShell.releasePointerCapture(event.pointerId);
+});
+
+surfaceShell.addEventListener('pointercancel', () => {
   dragState = null;
 });
 
