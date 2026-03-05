@@ -18,7 +18,7 @@ const poiLatInput = document.getElementById('poiLat');
 const poiLonInput = document.getElementById('poiLon');
 
 let pois = [];
-let viewState = { scale: 1, rotation: 0, moonX: 0, moonY: 0 };
+let viewState = { scale: 1, rotation: 0 };
 let dragState = null;
 let spinState = { enabled: true, rafId: null, lastTs: 0 };
 
@@ -66,11 +66,12 @@ function setStatus(message, variant = 'neutral') {
 }
 
 function applyView() {
-  const { scale, rotation, moonX, moonY } = viewState;
+  const { scale, rotation } = viewState;
+  const darksideProgress = Math.min(1, Math.max(0, (Math.abs(rotation) - 180) / 120));
   moonSurface.style.transform = `scale(${scale})`;
   moonSurface.style.backgroundPosition = `${50 + rotation / 3.6}% center`;
-  surfaceShell.style.setProperty('--moon-x', `${moonX}px`);
-  surfaceShell.style.setProperty('--moon-y', `${moonY}px`);
+  moonSurface.style.setProperty('--darkside-progress', darksideProgress.toFixed(3));
+  moonSurface.style.setProperty('--darkside-angle', rotation >= 0 ? '90deg' : '270deg');
   zoomLabel.textContent = `${Math.round(scale * 100)}%`;
   renderPOIDots();
 }
@@ -191,7 +192,7 @@ function updateScale(nextScale) {
 }
 
 function updateRotation(delta) {
-  viewState.rotation = normalizeLon(viewState.rotation + delta);
+  viewState.rotation += delta;
   applyView();
 }
 
@@ -223,7 +224,7 @@ rotateLeftBtn.addEventListener('click', () => updateRotation(-12));
 rotateRightBtn.addEventListener('click', () => updateRotation(12));
 spinToggleBtn.addEventListener('click', () => setSpin(!spinState.enabled));
 resetViewBtn.addEventListener('click', () => {
-  viewState = { scale: 1, rotation: 0, moonX: 0, moonY: 0 };
+  viewState = { scale: 1, rotation: 0 };
   applyView();
 });
 
@@ -240,14 +241,8 @@ surfaceShell.addEventListener('pointerdown', (event) => {
 surfaceShell.addEventListener('pointermove', (event) => {
   if (!dragState) return;
   const dx = event.clientX - dragState.x;
-  const dy = event.clientY - dragState.y;
   dragState = { x: event.clientX, y: event.clientY };
-
-  const bounds = surfaceStage.getBoundingClientRect();
-  const maxOffset = Math.max(0, (bounds.width - surfaceShell.offsetWidth) / 2);
-  viewState.moonX = Math.max(-maxOffset, Math.min(maxOffset, viewState.moonX + dx));
-  viewState.moonY = Math.max(-maxOffset, Math.min(maxOffset, viewState.moonY + dy));
-  applyView();
+  updateRotation(dx * 0.35);
 });
 
 surfaceShell.addEventListener('pointerup', () => {
