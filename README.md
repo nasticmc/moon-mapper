@@ -4,6 +4,7 @@ Moon Mapper is a single-page lunar exploration app where all points of interest 
 
 ## Features
 
+- **Real moon imagery basemap** (LRO/LOLA) with animated spin/rotation controls.
 - **Interactive moon map** with zoom, wheel zoom, drag-to-pan, and reset.
 - **Click-to-prefill coordinates** for fast marker placement.
 - **POI form** with name, description, lat/lon, links, and file attachments.
@@ -14,7 +15,7 @@ Moon Mapper is a single-page lunar exploration app where all points of interest 
 
 - `index.html` — app layout, controls, POI form/list.
 - `styles.css` — visual styling and responsive layout.
-- `app.js` — browser-side interactions and API calls.
+- `app.js` — browser-side interactions, server sync, zoom, and rotation logic.
 - `server.js` — static file server + shared POI API.
 - `data/pois.json` — persisted POI storage file (created automatically).
 
@@ -51,3 +52,8 @@ http://192.168.1.42:4173
 
 - POIs are persisted on disk in `data/pois.json`, not in browser local storage.
 - Uploaded files are stored as data URLs inside POI records.
+
+
+## Imagery attribution
+
+- Lunar basemap: [Whole moon surface topography by LRO and LOLA](https://commons.wikimedia.org/wiki/File:Whole_moon_surface_topography_by_LRO_and_LOLA.jpg).

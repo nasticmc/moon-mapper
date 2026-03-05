@@ -17,6 +17,9 @@
         <div class="controls">
           <button id="zoomIn" type="button">＋ Zoom In</button>
           <button id="zoomOut" type="button">－ Zoom Out</button>
+          <button id="rotateLeft" type="button">⟲ Rotate Left</button>
+          <button id="rotateRight" type="button">⟳ Rotate Right</button>
+          <button id="toggleSpin" type="button">Pause Spin</button>
           <button id="resetView" type="button">Reset View</button>
           <span id="zoomLabel">100%</span>
         </div>
@@ -25,7 +28,8 @@
           <div class="moon-surface" id="moonSurface" aria-label="Interactive moon surface"></div>
         </div>
 
-        <p class="hint">Tip: click anywhere on the moon to prefill latitude/longitude for a new point.</p>
+        <p class="hint">Tip: click to prefill coordinates. Use rotate controls for real lunar imagery rotation.</p>
+        <p class="surface-credit">Moon basemap: <a href="https://commons.wikimedia.org/wiki/File:Whole_moon_surface_topography_by_LRO_and_LOLA.jpg" target="_blank" rel="noreferrer noopener">LRO/LOLA global lunar topography</a>.</p>
         <p id="syncStatus" class="sync-status" aria-live="polite"></p>
       </section>
 

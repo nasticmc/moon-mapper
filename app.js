@@ -9,31 +9,42 @@ const zoomLabel = document.getElementById('zoomLabel');
 const zoomInBtn = document.getElementById('zoomIn');
 const zoomOutBtn = document.getElementById('zoomOut');
 const resetViewBtn = document.getElementById('resetView');
+const rotateLeftBtn = document.getElementById('rotateLeft');
+const rotateRightBtn = document.getElementById('rotateRight');
+const spinToggleBtn = document.getElementById('toggleSpin');
 
 const poiLatInput = document.getElementById('poiLat');
 const poiLonInput = document.getElementById('poiLon');
 
 let pois = [];
-let viewState = { scale: 1, offsetX: 0, offsetY: 0 };
+let viewState = { scale: 1, offsetX: 0, offsetY: 0, rotation: 0 };
 let dragState = null;
+let spinState = { enabled: true, rafId: null, lastTs: 0 };
+
+function normalizeLon(lon) {
+  let value = lon;
+  while (value > 180) value -= 360;
+  while (value < -180) value += 360;
+  return value;
+}
 
 function latLonToPercent(lat, lon) {
-  const x = ((lon + 180) / 360) * 100;
+  const shiftedLon = normalizeLon(lon + viewState.rotation);
+  const x = ((shiftedLon + 180) / 360) * 100;
   const y = ((90 - lat) / 180) * 100;
   return { x, y };
 }
 
 function percentToLatLon(x, y) {
-  const lon = (x / 100) * 360 - 180;
+  const shiftedLon = (x / 100) * 360 - 180;
+  const lon = normalizeLon(shiftedLon - viewState.rotation);
   const lat = 90 - (y / 100) * 180;
   return { lat: Number(lat.toFixed(1)), lon: Number(lon.toFixed(1)) };
 }
 
 async function fetchPOIsFromServer() {
   const response = await fetch('/api/pois');
-  if (!response.ok) {
-    throw new Error(`Unable to load POIs (${response.status})`);
-  }
+  if (!response.ok) throw new Error(`Unable to load POIs (${response.status})`);
   const data = await response.json();
   return Array.isArray(data.pois) ? data.pois : [];
 }
@@ -44,10 +55,7 @@ async function savePOIToServer(poi) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(poi)
   });
-
-  if (!response.ok) {
-    throw new Error(`Unable to save POI (${response.status})`);
-  }
+  if (!response.ok) throw new Error(`Unable to save POI (${response.status})`);
 }
 
 function setStatus(message, variant = 'neutral') {
@@ -57,9 +65,11 @@ function setStatus(message, variant = 'neutral') {
 }
 
 function applyView() {
-  const { scale, offsetX, offsetY } = viewState;
+  const { scale, offsetX, offsetY, rotation } = viewState;
   moonSurface.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+  moonSurface.style.backgroundPosition = `${50 + rotation / 3.6}% center`;
   zoomLabel.textContent = `${Math.round(scale * 100)}%`;
+  renderPOIDots();
 }
 
 function createPOIDot(poi) {
@@ -73,20 +83,21 @@ function createPOIDot(poi) {
   dot.addEventListener('click', () => {
     const card = document.getElementById(`poi-${poi.id}`);
     card?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    card?.animate([{ outline: '2px solid #fff' }, { outline: '0px solid transparent' }], {
-      duration: 1200,
-      easing: 'ease-out'
-    });
   });
   moonSurface.appendChild(dot);
 }
 
+function renderPOIDots() {
+  moonSurface.querySelectorAll('.poi-dot').forEach((n) => n.remove());
+  for (const poi of pois) createPOIDot(poi);
+}
+
 function renderPOIList() {
   poiList.innerHTML = '';
-  moonSurface.querySelectorAll('.poi-dot').forEach((n) => n.remove());
 
   if (!pois.length) {
     poiList.innerHTML = '<p>No points yet — add your first lunar marker.</p>';
+    renderPOIDots();
     return;
   }
 
@@ -107,9 +118,7 @@ function renderPOIList() {
         a.rel = 'noreferrer noopener';
         linksWrap.appendChild(a);
       }
-    } else {
-      linksWrap.textContent = 'No links attached';
-    }
+    } else linksWrap.textContent = 'No links attached';
 
     const filesWrap = node.querySelector('.poi-files');
     if (poi.files?.length) {
@@ -127,13 +136,12 @@ function renderPOIList() {
           filesWrap.appendChild(fileLink);
         }
       }
-    } else {
-      filesWrap.textContent = 'No files uploaded';
-    }
+    } else filesWrap.textContent = 'No files uploaded';
 
     poiList.appendChild(node);
-    createPOIDot(poi);
   }
+
+  renderPOIDots();
 }
 
 async function filesToPayload(fileList) {
@@ -152,27 +160,14 @@ async function filesToPayload(fileList) {
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
-  const name = document.getElementById('poiName').value.trim();
-  const description = document.getElementById('poiDescription').value.trim();
-  const lat = Number(poiLatInput.value);
-  const lon = Number(poiLonInput.value);
-  const links = document
-    .getElementById('poiLinks')
-    .value
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-  const files = await filesToPayload(document.getElementById('poiFiles').files);
-
   const poi = {
     id: crypto.randomUUID(),
-    name,
-    description,
-    lat,
-    lon,
-    links,
-    files
+    name: document.getElementById('poiName').value.trim(),
+    description: document.getElementById('poiDescription').value.trim(),
+    lat: Number(poiLatInput.value),
+    lon: Number(poiLonInput.value),
+    links: document.getElementById('poiLinks').value.split(',').map((s) => s.trim()).filter(Boolean),
+    files: await filesToPayload(document.getElementById('poiFiles').files)
   };
 
   try {
@@ -192,10 +187,40 @@ function updateScale(nextScale) {
   applyView();
 }
 
+function updateRotation(delta) {
+  viewState.rotation = normalizeLon(viewState.rotation + delta);
+  applyView();
+}
+
+function animationTick(ts) {
+  if (!spinState.enabled) return;
+  if (spinState.lastTs) {
+    const dt = ts - spinState.lastTs;
+    updateRotation((dt / 1000) * 5);
+  }
+  spinState.lastTs = ts;
+  spinState.rafId = requestAnimationFrame(animationTick);
+}
+
+function setSpin(enabled) {
+  spinState.enabled = enabled;
+  spinToggleBtn.textContent = enabled ? 'Pause Spin' : 'Resume Spin';
+  if (enabled) {
+    spinState.lastTs = 0;
+    if (!spinState.rafId) spinState.rafId = requestAnimationFrame(animationTick);
+  } else if (spinState.rafId) {
+    cancelAnimationFrame(spinState.rafId);
+    spinState.rafId = null;
+  }
+}
+
 zoomInBtn.addEventListener('click', () => updateScale(viewState.scale + 0.2));
 zoomOutBtn.addEventListener('click', () => updateScale(viewState.scale - 0.2));
+rotateLeftBtn.addEventListener('click', () => updateRotation(-12));
+rotateRightBtn.addEventListener('click', () => updateRotation(12));
+spinToggleBtn.addEventListener('click', () => setSpin(!spinState.enabled));
 resetViewBtn.addEventListener('click', () => {
-  viewState = { scale: 1, offsetX: 0, offsetY: 0 };
+  viewState = { scale: 1, offsetX: 0, offsetY: 0, rotation: 0 };
   applyView();
 });
 
@@ -239,6 +264,7 @@ async function init() {
     pois = await fetchPOIsFromServer();
     renderPOIList();
     setStatus(`Synced ${pois.length} POIs from server`, 'ok');
+    setSpin(true);
   } catch {
     setStatus('Unable to load shared POIs from server', 'error');
     poiList.innerHTML = '<p>Server unavailable. Start server.js to use shared data.</p>';
