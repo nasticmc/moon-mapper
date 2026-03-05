@@ -21,6 +21,11 @@ let pois = [];
 let viewState = { scale: 1, rotation: 0 };
 let dragState = null;
 let spinState = { enabled: true, rafId: null, lastTs: 0 };
+let suppressSurfaceClick = false;
+
+function clampLat(lat) {
+  return Math.min(90, Math.max(-90, lat));
+}
 
 function normalizeLon(lon) {
   let value = lon;
@@ -39,7 +44,7 @@ function latLonToPercent(lat, lon) {
 function percentToLatLon(x, y) {
   const shiftedLon = (x / 100) * 360 - 180;
   const lon = normalizeLon(shiftedLon - viewState.rotation);
-  const lat = 90 - (y / 100) * 180;
+  const lat = clampLat(90 - (y / 100) * 180);
   return { lat: Number(lat.toFixed(1)), lon: Number(lon.toFixed(1)) };
 }
 
@@ -234,14 +239,19 @@ surfaceShell.addEventListener('wheel', (event) => {
 });
 
 surfaceShell.addEventListener('pointerdown', (event) => {
-  dragState = { x: event.clientX, y: event.clientY };
+  dragState = { x: event.clientX, y: event.clientY, moved: false };
+  suppressSurfaceClick = false;
+  if (spinState.enabled) setSpin(false);
   surfaceShell.setPointerCapture(event.pointerId);
 });
 
 surfaceShell.addEventListener('pointermove', (event) => {
   if (!dragState) return;
   const dx = event.clientX - dragState.x;
-  dragState = { x: event.clientX, y: event.clientY };
+  const dy = event.clientY - dragState.y;
+  const moved = dragState.moved || Math.abs(dx) > 2 || Math.abs(dy) > 2;
+  dragState = { x: event.clientX, y: event.clientY, moved };
+  if (moved) suppressSurfaceClick = true;
   updateRotation(dx * 0.35);
 });
 
@@ -250,6 +260,13 @@ surfaceShell.addEventListener('pointerup', () => {
 });
 
 moonSurface.addEventListener('click', (event) => {
+  if (suppressSurfaceClick) {
+    suppressSurfaceClick = false;
+    return;
+  }
+
+  if (spinState.enabled) setSpin(false);
+
   const rect = moonSurface.getBoundingClientRect();
   const x = ((event.clientX - rect.left) / rect.width) * 100;
   const y = ((event.clientY - rect.top) / rect.height) * 100;
