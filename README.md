@@ -24,7 +24,7 @@ Moon Mapper is a single-page lunar exploration app that lets you:
 - `styles.css` — moon/map styling, layout, and POI visual styles.
 - `app.js` — interaction logic, POI rendering, uploads, persistence, zoom/pan.
 
-## Run Locally
+## Run (localhost only)
 
 From the repository root:
 
@@ -37,6 +37,22 @@ Open in your browser:
 ```text
 http://localhost:4173
 ```
+
+## Run on your local network
+
+To allow other devices on your network to reach the app, bind the server to all interfaces:
+
+```bash
+python3 -m http.server 4173 --bind 0.0.0.0
+```
+
+Then open from another machine using your host IP, for example:
+
+```text
+http://192.168.1.42:4173
+```
+
+> Tip: If remote devices still cannot connect, allow inbound TCP traffic on port `4173` in your OS/firewall settings.
 
 ## Usage
 
