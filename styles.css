@@ -84,8 +84,6 @@ button:hover { filter: brightness(1.1); }
 }
 
 .moon-surface {
-  --darkside-progress: 0;
-  --darkside-angle: 90deg;
   position: absolute;
   inset: 0;
   border-radius: 50%;
@@ -93,26 +91,10 @@ button:hover { filter: brightness(1.1); }
   background-image:
     radial-gradient(circle at 76% 78%, rgba(0,0,0,0.2), transparent 45%),
     radial-gradient(circle at 22% 26%, rgba(255,255,255,0.14), transparent 40%),
-    url('https://raw.githubusercontent.com/CelestiaProject/CelestiaContent/master/textures/hires/moon.jpg');
+    url('https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/lroc_color_2k.jpg');
   background-size: 100% 100%, 100% 100%, auto 100%;
   background-repeat: no-repeat, no-repeat, repeat-x;
   background-position: center, center, 50% center;
-}
-
-.moon-surface::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  pointer-events: none;
-  opacity: var(--darkside-progress);
-  background: linear-gradient(
-    var(--darkside-angle),
-    rgba(0, 0, 0, 0) 54%,
-    rgba(0, 0, 0, 0.82) 76%,
-    rgba(0, 0, 0, 0.98) 100%
-  );
-  transition: opacity 140ms linear;
 }
 
 .surface-shell::after {
