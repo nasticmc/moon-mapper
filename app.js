@@ -35,15 +35,15 @@ function normalizeLon(lon) {
 }
 
 function latLonToPercent(lat, lon) {
-  const shiftedLon = normalizeLon(lon + viewState.rotation);
-  const x = ((shiftedLon + 180) / 360) * 100;
+  // The equirectangular image (2:1) rendered at auto 100% in a square container
+  // is exactly 2× the container width, so 180° spans the full container width.
+  const x = 50 + (lon - viewState.rotation) * 100 / 180;
   const y = ((90 - lat) / 180) * 100;
   return { x, y };
 }
 
 function percentToLatLon(x, y) {
-  const shiftedLon = (x / 100) * 360 - 180;
-  const lon = normalizeLon(shiftedLon - viewState.rotation);
+  const lon = normalizeLon((x - 50) * 180 / 100 + viewState.rotation);
   const lat = clampLat(90 - (y / 100) * 180);
   return { lat: Number(lat.toFixed(1)), lon: Number(lon.toFixed(1)) };
 }
@@ -72,11 +72,8 @@ function setStatus(message, variant = 'neutral') {
 
 function applyView() {
   const { scale, rotation } = viewState;
-  const darksideProgress = Math.min(1, Math.max(0, (Math.abs(rotation) - 180) / 120));
   moonSurface.style.transform = `scale(${scale})`;
-  moonSurface.style.backgroundPosition = `${50 + rotation / 3.6}% center`;
-  moonSurface.style.setProperty('--darkside-progress', darksideProgress.toFixed(3));
-  moonSurface.style.setProperty('--darkside-angle', rotation >= 0 ? '90deg' : '270deg');
+  moonSurface.style.backgroundPosition = `${50 + rotation * 5 / 9}% center`;
   zoomLabel.textContent = `${Math.round(scale * 100)}%`;
   renderPOIDots();
 }
