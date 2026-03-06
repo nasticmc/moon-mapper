@@ -35,6 +35,7 @@ function generateId() {
 }
 
 let pois = [];
+let selectedPoiId = null;
 let viewState = { scale: 1, rotation: 0 };
 let dragState = null;
 let spinState = { enabled: true, rafId: null, lastTs: 0 };
@@ -100,15 +101,16 @@ function applyView() {
 
 function createPOIDot(poi) {
   const dot = document.createElement('button');
-  dot.className = 'poi-dot';
+  dot.className = 'poi-dot' + (poi.id === selectedPoiId ? ' poi-dot--selected' : '');
   dot.type = 'button';
   dot.title = poi.name;
   const { x, y } = latLonToPercent(poi.lat, poi.lon);
   dot.style.left = `${x}%`;
   dot.style.top = `${y}%`;
-  dot.addEventListener('click', () => {
-    const card = document.getElementById(`poi-${poi.id}`);
-    card?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  dot.addEventListener('click', (e) => {
+    e.stopPropagation();
+    selectedPoiId = poi.id;
+    renderPOIList();
   });
   moonSurface.appendChild(dot);
 }
@@ -121,53 +123,54 @@ function renderPOIDots() {
 function renderPOIList() {
   poiList.innerHTML = '';
 
-  if (!pois.length) {
-    poiList.innerHTML = '<p>No points yet — add your first lunar marker.</p>';
+  const poi = pois.find(p => p.id === selectedPoiId);
+
+  if (!poi) {
+    poiList.innerHTML = pois.length
+      ? '<p class="poi-empty">Click a marker on the globe to view details.</p>'
+      : '<p class="poi-empty">No points yet — add your first lunar marker.</p>';
     renderPOIDots();
     return;
   }
 
-  for (const poi of pois) {
-    const node = template.content.firstElementChild.cloneNode(true);
-    node.id = `poi-${poi.id}`;
-    node.querySelector('h3').textContent = poi.name;
-    node.querySelector('.poi-desc').textContent = poi.description || 'No description';
-    node.querySelector('.poi-coords').textContent = `Lat ${poi.lat.toFixed(1)}°, Lon ${poi.lon.toFixed(1)}°`;
+  const node = template.content.firstElementChild.cloneNode(true);
+  node.id = `poi-${poi.id}`;
+  node.querySelector('h3').textContent = poi.name;
+  node.querySelector('.poi-desc').textContent = poi.description || 'No description';
+  node.querySelector('.poi-coords').textContent = `Lat ${poi.lat.toFixed(1)}°, Lon ${poi.lon.toFixed(1)}°`;
 
-    const linksWrap = node.querySelector('.poi-links');
-    const safeLinks = (poi.links ?? []).filter(l => typeof l === 'string' && /^https?:\/\//i.test(l));
-    if (safeLinks.length) {
-      for (const url of safeLinks) {
-        const a = document.createElement('a');
-        a.href = url;
-        a.textContent = url;
-        a.target = '_blank';
-        a.rel = 'noreferrer noopener';
-        linksWrap.appendChild(a);
+  const linksWrap = node.querySelector('.poi-links');
+  const safeLinks = (poi.links ?? []).filter(l => typeof l === 'string' && /^https?:\/\//i.test(l));
+  if (safeLinks.length) {
+    for (const url of safeLinks) {
+      const a = document.createElement('a');
+      a.href = url;
+      a.textContent = url;
+      a.target = '_blank';
+      a.rel = 'noreferrer noopener';
+      linksWrap.appendChild(a);
+    }
+  } else linksWrap.textContent = 'No links attached';
+
+  const filesWrap = node.querySelector('.poi-files');
+  if (poi.files?.length) {
+    for (const file of poi.files) {
+      if (file.type.startsWith('image/')) {
+        const img = document.createElement('img');
+        img.src = file.dataUrl;
+        img.alt = `${poi.name} upload`;
+        filesWrap.appendChild(img);
+      } else {
+        const fileLink = document.createElement('a');
+        fileLink.href = file.dataUrl;
+        fileLink.textContent = `📎 ${file.name}`;
+        fileLink.download = file.name;
+        filesWrap.appendChild(fileLink);
       }
-    } else linksWrap.textContent = 'No links attached';
+    }
+  } else filesWrap.textContent = 'No files uploaded';
 
-    const filesWrap = node.querySelector('.poi-files');
-    if (poi.files?.length) {
-      for (const file of poi.files) {
-        if (file.type.startsWith('image/')) {
-          const img = document.createElement('img');
-          img.src = file.dataUrl;
-          img.alt = `${poi.name} upload`;
-          filesWrap.appendChild(img);
-        } else {
-          const fileLink = document.createElement('a');
-          fileLink.href = file.dataUrl;
-          fileLink.textContent = `📎 ${file.name}`;
-          fileLink.download = file.name;
-          filesWrap.appendChild(fileLink);
-        }
-      }
-    } else filesWrap.textContent = 'No files uploaded';
-
-    poiList.appendChild(node);
-  }
-
+  poiList.appendChild(node);
   renderPOIDots();
 }
 
@@ -220,7 +223,7 @@ function updateScale(nextScale) {
 }
 
 function updateRotation(delta) {
-  viewState.rotation += delta;
+  viewState.rotation = normalizeLon(viewState.rotation + delta);
   applyView();
 }
 
@@ -289,6 +292,9 @@ moonSurface.addEventListener('click', (event) => {
   }
 
   if (spinState.enabled) setSpin(false);
+
+  selectedPoiId = null;
+  renderPOIList();
 
   const rect = moonSurface.getBoundingClientRect();
   const x = ((event.clientX - rect.left) / rect.width) * 100;
