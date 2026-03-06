@@ -109,19 +109,26 @@ button:hover { filter: brightness(1.1); }
 
 .poi-dot {
   position: absolute;
-  width: 14px;
-  height: 14px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: #ff5f7e;
-  border: 2px solid #ffd3dc;
+  border: 1.5px solid #ffd3dc;
   transform: translate(-50%, -50%);
   box-shadow: 0 0 0 0 rgba(255, 95, 126, 0.8);
   animation: pulse 2.2s infinite;
 }
 
+.poi-dot--selected {
+  background: #ffe066;
+  border-color: #fff;
+  animation: none;
+  box-shadow: 0 0 0 3px rgba(255, 224, 102, 0.5);
+}
+
 @keyframes pulse {
   0% { box-shadow: 0 0 0 0 rgba(255,95,126,.8); }
-  80% { box-shadow: 0 0 0 14px rgba(255,95,126,0); }
+  80% { box-shadow: 0 0 0 8px rgba(255,95,126,0); }
   100% { box-shadow: 0 0 0 0 rgba(255,95,126,0); }
 }
 
@@ -163,6 +170,7 @@ input, textarea {
 .coord-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
 
 .poi-list { display: grid; gap: 0.7rem; max-height: 50vh; overflow: auto; }
+.poi-empty { color: var(--muted); font-size: 0.92rem; margin: 0; }
 .poi-card {
   border-radius: 8px;
   padding: 0.65rem;
