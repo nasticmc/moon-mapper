@@ -61,7 +61,10 @@ async function savePOIToServer(poi) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(poi)
   });
-  if (!response.ok) throw new Error(`Unable to save POI (${response.status})`);
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.error || `Unable to save POI (${response.status})`);
+  }
 }
 
 function setStatus(message, variant = 'neutral') {
@@ -115,8 +118,9 @@ function renderPOIList() {
     node.querySelector('.poi-coords').textContent = `Lat ${poi.lat.toFixed(1)}°, Lon ${poi.lon.toFixed(1)}°`;
 
     const linksWrap = node.querySelector('.poi-links');
-    if (poi.links?.length) {
-      for (const url of poi.links) {
+    const safeLinks = (poi.links ?? []).filter(l => typeof l === 'string' && /^https?:\/\//i.test(l));
+    if (safeLinks.length) {
+      for (const url of safeLinks) {
         const a = document.createElement('a');
         a.href = url;
         a.textContent = url;
@@ -150,9 +154,14 @@ function renderPOIList() {
   renderPOIDots();
 }
 
+const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB per file
+
 async function filesToPayload(fileList) {
   const payload = [];
   for (const file of fileList) {
+    if (file.size > MAX_FILE_BYTES) {
+      throw new Error(`"${file.name}" is ${(file.size / 1024 / 1024).toFixed(1)} MB — files must be under 10 MB.`);
+    }
     const dataUrl = await new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result));
@@ -166,25 +175,25 @@ async function filesToPayload(fileList) {
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
-  const poi = {
-    id: crypto.randomUUID(),
-    name: document.getElementById('poiName').value.trim(),
-    description: document.getElementById('poiDescription').value.trim(),
-    lat: Number(poiLatInput.value),
-    lon: Number(poiLonInput.value),
-    links: document.getElementById('poiLinks').value.split(',').map((s) => s.trim()).filter(Boolean),
-    files: await filesToPayload(document.getElementById('poiFiles').files)
-  };
-
   try {
+    const files = await filesToPayload(document.getElementById('poiFiles').files);
+    const poi = {
+      id: crypto.randomUUID(),
+      name: document.getElementById('poiName').value.trim(),
+      description: document.getElementById('poiDescription').value.trim(),
+      lat: Number(poiLatInput.value),
+      lon: Number(poiLonInput.value),
+      links: document.getElementById('poiLinks').value.split(',').map((s) => s.trim()).filter(Boolean),
+      files
+    };
     setStatus('Saving to server...', 'neutral');
     await savePOIToServer(poi);
     pois = await fetchPOIsFromServer();
     renderPOIList();
     form.reset();
     setStatus(`Synced ${pois.length} POIs from server`, 'ok');
-  } catch {
-    setStatus('Failed to save POI to server', 'error');
+  } catch (err) {
+    setStatus(err.message || 'Failed to save POI to server', 'error');
   }
 });
 
