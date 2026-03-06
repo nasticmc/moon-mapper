@@ -1,13 +1,16 @@
-# Moon Mapper
+# Moon Mapper `v0.3`
 
 Moon Mapper is a single-page lunar exploration app. Points of interest (POIs) are persisted on the server so every connected device shares the same dataset in real time.
+
+See [VERSIONS.md](VERSIONS.md) for the full version history.
 
 ## Features
 
 - **NASA LROC basemap** — high-resolution equirectangular lunar imagery from the Lunar Reconnaissance Orbiter Camera, sized so the texture aligns precisely with dropped POI coordinates at any rotation angle.
-- **Interactive globe view** — animated auto-spin, drag-to-rotate, scroll/button zoom, and reset controls.
+- **Interactive globe view** — animated auto-spin, drag-to-rotate, scroll/button zoom, and reset controls; rotation normalised so POI positions stay accurate across full rotations.
 - **Click-to-prefill** — click anywhere on the moon surface to populate the latitude/longitude fields instantly.
 - **POI form** — name, description, lat/lon, comma-separated resource links, and file attachments (images, PDFs, and more).
+- **POI detail panel** — click a marker on the globe to highlight it and view its full details; clicking the bare surface deselects.
 - **Server-side persistence** — POIs are stored in `data/pois.json` and shared across all clients connected to the same server.
 
 ## Project structure
