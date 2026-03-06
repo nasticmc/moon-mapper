@@ -17,6 +17,23 @@ const spinToggleBtn = document.getElementById('toggleSpin');
 const poiLatInput = document.getElementById('poiLat');
 const poiLonInput = document.getElementById('poiLon');
 
+function generateId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  // Fallback for non-secure contexts (e.g. plain HTTP)
+  const bytes = new Uint8Array(16);
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < 16; i++) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+  bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant 1
+  const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 let pois = [];
 let viewState = { scale: 1, rotation: 0 };
 let dragState = null;
@@ -178,7 +195,7 @@ form.addEventListener('submit', async (event) => {
   try {
     const files = await filesToPayload(document.getElementById('poiFiles').files);
     const poi = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       name: document.getElementById('poiName').value.trim(),
       description: document.getElementById('poiDescription').value.trim(),
       lat: Number(poiLatInput.value),
@@ -242,7 +259,7 @@ resetViewBtn.addEventListener('click', () => {
 surfaceShell.addEventListener('wheel', (event) => {
   event.preventDefault();
   updateScale(viewState.scale + (event.deltaY < 0 ? 0.1 : -0.1));
-});
+}, { passive: false });
 
 surfaceShell.addEventListener('pointerdown', (event) => {
   dragState = { x: event.clientX, y: event.clientY, moved: false };
