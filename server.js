@@ -151,7 +151,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    if (req.method === 'GET' && req.url.startsWith('/api/pois')) {
+    if (req.method === 'GET' && (req.url === '/api/pois' || req.url.startsWith('/api/pois?'))) {
       const pois = await readPOIs();
       sendJson(res, 200, { pois });
       return;
