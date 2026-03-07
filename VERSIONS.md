@@ -1,5 +1,16 @@
 # Moon Mapper — Version History
 
+## v0.4 — Full-Moon Redesign
+
+- **Layout overhaul** — replaced the two-column grid (globe + sidebar) with a full-viewport moon that fills the screen; controls float in a compact HUD over the globe.
+- **Warm neutral theme** — swapped the electric-blue neon palette for dark grays, muted stone text, and a warm gold accent; buttons are flat with subtle borders instead of blue gradients.
+- **Quieter POI markers** — removed the pulsing animation; dots are now gold with a hover-scale effect, and the selected state uses a white dot with a soft accent ring.
+- **Review link removed** — the "Review POIs" shortcut is no longer shown on the main page; the review page is still accessible directly at `/review`.
+- **Typography cleanup** — switched to Helvetica Neue, dropped the emoji from the page title, lighter font weights throughout.
+- **Form polish** — gold focus rings on inputs, consistent font inheritance, more restrained modal styling.
+
+---
+
 ## v0.3 — Globe & POI Display Polish
 
 - **Rotation coordinate fix** — `viewState.rotation` is now normalised to `[-180, 180]` on every update, so POI markers stay anchored to their correct lunar coordinates no matter how many full rotations the globe has made.

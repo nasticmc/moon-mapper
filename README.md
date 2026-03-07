@@ -1,4 +1,4 @@
-# Moon Mapper `v0.3`
+# Moon Mapper `v0.4`
 
 Moon Mapper is a single-page lunar exploration app. Points of interest (POIs) are persisted on the server so every connected device shares the same dataset in real time.
 
@@ -11,6 +11,7 @@ See [VERSIONS.md](VERSIONS.md) for the full version history.
 - **Click-to-prefill** — click anywhere on the moon surface to populate the latitude/longitude fields instantly.
 - **POI form** — name, description, lat/lon, comma-separated resource links, and file attachments (images, PDFs, and more).
 - **POI detail panel** — click a marker on the globe to highlight it and view its full details; clicking the bare surface deselects.
+- **Approval workflow** — new POIs start as pending; reviewers approve or reject them on a dedicated review page (`/review`). Only approved POIs appear on the main map.
 - **Server-side persistence** — POIs are stored in `data/pois.json` and shared across all clients connected to the same server.
 
 ## Project structure
@@ -18,6 +19,7 @@ See [VERSIONS.md](VERSIONS.md) for the full version history.
 ```
 moon-mapper/
 ├── index.html       # App layout, controls, POI form and list
+├── review.html      # POI review/approval page for pending submissions
 ├── styles.css       # Visual styling and responsive layout
 ├── app.js           # Browser-side interactions: sync, zoom, rotation, POI rendering
 ├── server.js        # Static file server + shared POI REST API
@@ -51,16 +53,25 @@ Environment variables:
 
 ### `GET /api/pois`
 
-Returns all saved POIs.
+Returns all **approved** POIs (shown on the main map).
 
 **Response `200`**
 ```json
-{ "pois": [ { "id": "...", "name": "...", "lat": 0.0, "lon": 0.0, ... } ] }
+{ "pois": [ { "id": "...", "name": "...", "lat": 0.0, "lon": 0.0, "approved": true, ... } ] }
+```
+
+### `GET /api/pois/pending`
+
+Returns all **unapproved** POIs (used by the review page).
+
+**Response `200`**
+```json
+{ "pois": [ { "id": "...", "name": "...", "lat": 0.0, "lon": 0.0, "approved": false, ... } ] }
 ```
 
 ### `POST /api/pois`
 
-Saves a new POI. Concurrent requests are serialised to prevent data loss.
+Submits a new POI. The POI starts as unapproved and must be approved via the review page before it appears on the map. Concurrent requests are serialised to prevent data loss.
 
 **Request body**
 ```json
@@ -81,10 +92,28 @@ Saves a new POI. Concurrent requests are serialised to prevent data loss.
 
 | Status | Meaning |
 |---|---|
-| `201` | POI saved successfully |
+| `201` | POI saved successfully (pending review) |
 | `400` | Payload failed validation or body was not valid JSON |
 | `409` | A POI with this `id` already exists |
 | `413` | Request body exceeds the 50 MB limit |
+
+### `POST /api/pois/:id/approve`
+
+Approves a pending POI so it appears on the main map.
+
+| Status | Meaning |
+|---|---|
+| `200` | POI approved |
+| `404` | POI not found |
+
+### `DELETE /api/pois/:id`
+
+Rejects and permanently deletes a POI.
+
+| Status | Meaning |
+|---|---|
+| `200` | POI deleted |
+| `404` | POI not found |
 
 **Validation rules**
 
