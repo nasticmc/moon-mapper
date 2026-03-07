@@ -1,4 +1,4 @@
-# Moon Mapper `v0.3`
+# Moon Mapper `v0.4`
 
 Moon Mapper is a single-page lunar exploration app. Points of interest (POIs) are persisted on the server so every connected device shares the same dataset in real time.
 
