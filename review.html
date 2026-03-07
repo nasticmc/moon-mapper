@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Moon Mapper — Review POIs</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        --bg: #0a1022;
+        --panel: #101932;
+        --muted: #8ea1c5;
+        --accent: #7eb8ff;
+        --accent-2: #6df0c2;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        background: radial-gradient(circle at 40% 20%, #16284f 0%, var(--bg) 55%);
+        color: #edf3ff;
+        min-height: 100vh;
+        padding: 2rem 1rem 3rem;
+      }
+
+      .page { max-width: 780px; margin: auto; }
+
+      header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+      }
+
+      header h1 { margin: 0; font-size: 1.4rem; }
+
+      .back-link {
+        color: var(--accent);
+        text-decoration: none;
+        font-size: 0.88rem;
+        padding: 0.42rem 0.75rem;
+        border: 1px solid rgba(126, 184, 255, 0.3);
+        border-radius: 7px;
+        transition: filter 0.15s;
+      }
+
+      .back-link:hover { filter: brightness(1.25); }
+
+      .status-bar {
+        text-align: center;
+        padding: 1rem;
+        font-size: 0.9rem;
+        color: var(--muted);
+        margin-bottom: 0.5rem;
+      }
+
+      .poi-list { display: grid; gap: 1.4rem; }
+
+      .poi-card {
+        background: var(--panel);
+        border: 1px solid rgba(126, 184, 255, 0.16);
+        border-radius: 14px;
+        padding: 1.1rem 1.3rem;
+      }
+
+      .poi-card h2 { margin: 0 0 0.35rem; font-size: 1.1rem; }
+
+      .poi-meta {
+        color: #b8cffb;
+        font-size: 0.85rem;
+        margin: 0.15rem 0;
+      }
+
+      .poi-desc {
+        color: #d4e4ff;
+        margin: 0.55rem 0;
+        font-size: 0.92rem;
+        line-height: 1.5;
+      }
+
+      .poi-links { margin: 0.4rem 0; }
+
+      .poi-links a {
+        color: var(--accent-2);
+        display: block;
+        font-size: 0.88rem;
+        word-break: break-all;
+      }
+
+      .poi-files { margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+      .poi-files img {
+        max-width: 180px;
+        max-height: 140px;
+        object-fit: cover;
+        border-radius: 8px;
+        border: 1px solid rgba(126, 184, 255, 0.15);
+      }
+
+      .poi-files a {
+        color: #b8cffb;
+        font-size: 0.88rem;
+        align-self: center;
+      }
+
+      .card-actions {
+        display: flex;
+        gap: 0.7rem;
+        margin-top: 1rem;
+      }
+
+      button {
+        border: 0;
+        border-radius: 8px;
+        padding: 0.5rem 1.1rem;
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-family: inherit;
+      }
+
+      button:hover { filter: brightness(1.12); }
+
+      .btn-approve {
+        background: linear-gradient(120deg, #1a6f4a, #29b37a);
+        color: white;
+      }
+
+      .btn-reject {
+        background: linear-gradient(120deg, #6b1a28, #c43355);
+        color: white;
+      }
+
+      .badge {
+        display: inline-block;
+        font-size: 0.75rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: 99px;
+        background: rgba(126, 184, 255, 0.15);
+        color: var(--accent);
+        margin-left: 0.5rem;
+        vertical-align: middle;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header>
+        <a href="/" class="back-link">← Back to Map</a>
+        <h1>🌕 Review Pending POIs</h1>
+      </header>
+
+      <div id="statusBar" class="status-bar">Loading pending POIs…</div>
+      <div id="poiList" class="poi-list"></div>
+    </div>
+
+    <script>
+      const statusBar = document.getElementById('statusBar');
+      const listEl    = document.getElementById('poiList');
+      let pendingCount = 0;
+
+      async function loadPending() {
+        try {
+          const res = await fetch('/api/pois/pending');
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          const pois = data.pois || [];
+          pendingCount = pois.length;
+          render(pois);
+        } catch (err) {
+          statusBar.textContent = 'Failed to load pending POIs: ' + err.message;
+        }
+      }
+
+      function render(pois) {
+        listEl.innerHTML = '';
+        updateStatusBar();
+        if (pois.length === 0) return;
+        for (const poi of pois) listEl.appendChild(buildCard(poi));
+      }
+
+      function updateStatusBar() {
+        statusBar.textContent = pendingCount === 0
+          ? 'No pending POIs — all caught up!'
+          : `${pendingCount} pending POI${pendingCount !== 1 ? 's' : ''} awaiting review`;
+      }
+
+      function buildCard(poi) {
+        const card = document.createElement('div');
+        card.className = 'poi-card';
+        card.id = `card-${poi.id}`;
+
+        const titleEl = document.createElement('h2');
+        titleEl.textContent = poi.name;
+        card.appendChild(titleEl);
+
+        const metaEl = document.createElement('p');
+        metaEl.className = 'poi-meta';
+        metaEl.textContent = `Lat ${poi.lat.toFixed(1)}°, Lon ${poi.lon.toFixed(1)}°`;
+        card.appendChild(metaEl);
+
+        if (poi.description) {
+          const descEl = document.createElement('p');
+          descEl.className = 'poi-desc';
+          descEl.textContent = poi.description;
+          card.appendChild(descEl);
+        }
+
+        const safeLinks = (poi.links || []).filter(l => /^https?:\/\//i.test(l));
+        if (safeLinks.length) {
+          const linksEl = document.createElement('div');
+          linksEl.className = 'poi-links';
+          for (const url of safeLinks) {
+            const a = document.createElement('a');
+            a.href = url;
+            a.textContent = url;
+            a.target = '_blank';
+            a.rel = 'noreferrer noopener';
+            linksEl.appendChild(a);
+          }
+          card.appendChild(linksEl);
+        }
+
+        if (poi.files?.length) {
+          const filesEl = document.createElement('div');
+          filesEl.className = 'poi-files';
+          for (const f of poi.files) {
+            if (f.type.startsWith('image/')) {
+              const img = document.createElement('img');
+              img.src = f.dataUrl;
+              img.alt = f.name;
+              filesEl.appendChild(img);
+            } else {
+              const a = document.createElement('a');
+              a.href = f.dataUrl;
+              a.textContent = '📎 ' + f.name;
+              a.download = f.name;
+              filesEl.appendChild(a);
+            }
+          }
+          card.appendChild(filesEl);
+        }
+
+        const actions = document.createElement('div');
+        actions.className = 'card-actions';
+
+        const approveBtn = document.createElement('button');
+        approveBtn.className = 'btn-approve';
+        approveBtn.textContent = '✓ Approve';
+        approveBtn.addEventListener('click', () => approvePoi(poi.id, card));
+
+        const rejectBtn = document.createElement('button');
+        rejectBtn.className = 'btn-reject';
+        rejectBtn.textContent = '✕ Reject';
+        rejectBtn.addEventListener('click', () => rejectPoi(poi.id, card));
+
+        actions.appendChild(approveBtn);
+        actions.appendChild(rejectBtn);
+        card.appendChild(actions);
+
+        return card;
+      }
+
+      async function approvePoi(id, card) {
+        try {
+          const res = await fetch(`/api/pois/${encodeURIComponent(id)}/approve`, { method: 'POST' });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          card.remove();
+          pendingCount--;
+          updateStatusBar();
+        } catch (err) {
+          alert('Failed to approve: ' + err.message);
+        }
+      }
+
+      async function rejectPoi(id, card) {
+        if (!confirm('Permanently delete this POI?')) return;
+        try {
+          const res = await fetch(`/api/pois/${encodeURIComponent(id)}`, { method: 'DELETE' });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          card.remove();
+          pendingCount--;
+          updateStatusBar();
+        } catch (err) {
+          alert('Failed to reject: ' + err.message);
+        }
+      }
+
+      loadPending();
+    </script>
+  </body>
+</html>
