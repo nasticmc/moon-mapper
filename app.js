@@ -11,6 +11,8 @@ const zoomOutBtn    = document.getElementById('zoomOut');
 const resetViewBtn  = document.getElementById('resetView');
 const rotateLeftBtn = document.getElementById('rotateLeft');
 const rotateRightBtn= document.getElementById('rotateRight');
+const tiltUpBtn     = document.getElementById('tiltUp');
+const tiltDownBtn   = document.getElementById('tiltDown');
 const spinToggleBtn = document.getElementById('toggleSpin');
 
 // Modal elements
@@ -28,7 +30,7 @@ const panelClose    = document.getElementById('panelClose');
 // ── State ─────────────────────────────────────────────────────────────────────
 let pois            = [];
 let selectedPoiId   = null;
-let viewState       = { scale: 1, rotation: 0 };
+let viewState       = { scale: 1, rotation: 0, tilt: 0 };
 let dragState       = null;
 let spinState       = { enabled: true, rafId: null, lastTs: 0 };
 let suppressClick   = false;
@@ -62,13 +64,13 @@ function normalizeLon(lon) {
 
 function latLonToPercent(lat, lon) {
   const x = 50 + (lon - viewState.rotation) * 100 / 180;
-  const y = ((90 - lat) / 180) * 100;
+  const y = 100 * (45 - lat + viewState.tilt) / 90;
   return { x, y };
 }
 
 function percentToLatLon(x, y) {
   const lon = normalizeLon((x - 50) * 180 / 100 + viewState.rotation);
-  const lat = clampLat(90 - (y / 100) * 180);
+  const lat = clampLat(45 + viewState.tilt - y * 90 / 100);
   return { lat: Number(lat.toFixed(1)), lon: Number(lon.toFixed(1)) };
 }
 
@@ -109,9 +111,11 @@ function setStatus(message, variant = 'neutral') {
 
 // ── View rendering ────────────────────────────────────────────────────────────
 function applyView() {
-  const { scale, rotation } = viewState;
+  const { scale, rotation, tilt } = viewState;
   moonSurface.style.transform = `scale(${scale})`;
-  moonSurface.style.backgroundPosition = `center, center, ${50 + rotation * 5 / 9}% center`;
+  const bgX = `${50 + rotation * 5 / 9}%`;
+  const bgY = `${50 - tilt * 100 / 90}%`;
+  moonSurface.style.backgroundPosition = `center, center, ${bgX} ${bgY}`;
   zoomLabel.textContent = `${Math.round(scale * 100)}%`;
   renderPOIDots();
 }
@@ -280,6 +284,11 @@ function updateRotation(delta) {
   applyView();
 }
 
+function updateTilt(delta) {
+  viewState.tilt = Math.min(45, Math.max(-45, viewState.tilt + delta));
+  applyView();
+}
+
 function animationTick(ts) {
   if (!spinState.enabled) return;
   if (spinState.lastTs) {
@@ -307,9 +316,11 @@ zoomInBtn.addEventListener('click',   () => updateScale(viewState.scale + 0.2));
 zoomOutBtn.addEventListener('click',  () => updateScale(viewState.scale - 0.2));
 rotateLeftBtn.addEventListener('click',  () => updateRotation(-12));
 rotateRightBtn.addEventListener('click', () => updateRotation(12));
+tiltUpBtn.addEventListener('click',   () => updateTilt(12));
+tiltDownBtn.addEventListener('click', () => updateTilt(-12));
 spinToggleBtn.addEventListener('click',  () => setSpin(!spinState.enabled));
 resetViewBtn.addEventListener('click', () => {
-  viewState = { scale: 1, rotation: 0 };
+  viewState = { scale: 1, rotation: 0, tilt: 0 };
   applyView();
 });
 
@@ -357,6 +368,7 @@ surfaceShell.addEventListener('pointermove', (event) => {
   }
 
   updateRotation(dx * 0.35);
+  updateTilt(-dy * 0.35);
 });
 
 surfaceShell.addEventListener('pointerup', () => {
