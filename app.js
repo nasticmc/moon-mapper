@@ -1,60 +1,66 @@
-const surfaceStage = document.getElementById('surfaceStage');
-const surfaceShell = document.getElementById('surfaceShell');
-const moonSurface = document.getElementById('moonSurface');
-const form = document.getElementById('poiForm');
-const poiList = document.getElementById('poiList');
-const template = document.getElementById('poiTemplate');
-const syncStatus = document.getElementById('syncStatus');
+// ── DOM refs ──────────────────────────────────────────────────────────────────
+const surfaceShell  = document.getElementById('surfaceShell');
+const moonSurface   = document.getElementById('moonSurface');
+const poiList       = document.getElementById('poiList');
+const template      = document.getElementById('poiTemplate');
+const syncStatus    = document.getElementById('syncStatus');
 
-const zoomLabel = document.getElementById('zoomLabel');
-const zoomInBtn = document.getElementById('zoomIn');
-const zoomOutBtn = document.getElementById('zoomOut');
-const resetViewBtn = document.getElementById('resetView');
+const zoomLabel     = document.getElementById('zoomLabel');
+const zoomInBtn     = document.getElementById('zoomIn');
+const zoomOutBtn    = document.getElementById('zoomOut');
+const resetViewBtn  = document.getElementById('resetView');
 const rotateLeftBtn = document.getElementById('rotateLeft');
-const rotateRightBtn = document.getElementById('rotateRight');
+const rotateRightBtn= document.getElementById('rotateRight');
 const spinToggleBtn = document.getElementById('toggleSpin');
 
-const poiLatInput = document.getElementById('poiLat');
-const poiLonInput = document.getElementById('poiLon');
+// Modal elements
+const modalBackdrop = document.getElementById('modalBackdrop');
+const modalClose    = document.getElementById('modalClose');
+const cancelModal   = document.getElementById('cancelModal');
+const form          = document.getElementById('poiForm');
+const poiLatInput   = document.getElementById('poiLat');
+const poiLonInput   = document.getElementById('poiLon');
 
+// Detail panel elements
+const detailPanel   = document.getElementById('detailPanel');
+const panelClose    = document.getElementById('panelClose');
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let pois            = [];
+let selectedPoiId   = null;
+let viewState       = { scale: 1, rotation: 0 };
+let dragState       = null;
+let spinState       = { enabled: true, rafId: null, lastTs: 0 };
+let suppressClick   = false;
+let longPressTimer  = null;
+let longPressOrigin = { x: 0, y: 0 };
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
 function generateId() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
   }
-  // Fallback for non-secure contexts (e.g. plain HTTP)
   const bytes = new Uint8Array(16);
   if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
     crypto.getRandomValues(bytes);
   } else {
     for (let i = 0; i < 16; i++) bytes[i] = Math.floor(Math.random() * 256);
   }
-  bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
-  bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant 1
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
   const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
 }
 
-let pois = [];
-let selectedPoiId = null;
-let viewState = { scale: 1, rotation: 0 };
-let dragState = null;
-let spinState = { enabled: true, rafId: null, lastTs: 0 };
-let suppressSurfaceClick = false;
-
-function clampLat(lat) {
-  return Math.min(90, Math.max(-90, lat));
-}
-
+function clampLat(lat)    { return Math.min(90, Math.max(-90, lat)); }
 function normalizeLon(lon) {
-  let value = lon;
-  while (value > 180) value -= 360;
-  while (value < -180) value += 360;
-  return value;
+  let v = lon;
+  while (v >  180) v -= 360;
+  while (v < -180) v += 360;
+  return v;
 }
 
 function latLonToPercent(lat, lon) {
-  // The equirectangular image (2:1) rendered at auto 100% in a square container
-  // is exactly 2× the container width, so 180° spans the full container width.
   const x = 50 + (lon - viewState.rotation) * 100 / 180;
   const y = ((90 - lat) / 180) * 100;
   return { x, y };
@@ -66,6 +72,15 @@ function percentToLatLon(x, y) {
   return { lat: Number(lat.toFixed(1)), lon: Number(lon.toFixed(1)) };
 }
 
+/** Convert a pointer event's client coordinates to lunar lat/lon */
+function clientToLatLon(clientX, clientY) {
+  const rect = moonSurface.getBoundingClientRect();
+  const x = ((clientX - rect.left)  / rect.width)  * 100;
+  const y = ((clientY - rect.top)   / rect.height) * 100;
+  return percentToLatLon(x, y);
+}
+
+// ── Server API ────────────────────────────────────────────────────────────────
 async function fetchPOIsFromServer() {
   const response = await fetch('/api/pois');
   if (!response.ok) throw new Error(`Unable to load POIs (${response.status})`);
@@ -85,16 +100,18 @@ async function savePOIToServer(poi) {
   }
 }
 
+// ── Status bar ────────────────────────────────────────────────────────────────
 function setStatus(message, variant = 'neutral') {
   if (!syncStatus) return;
   syncStatus.textContent = message;
   syncStatus.dataset.variant = variant;
 }
 
+// ── View rendering ────────────────────────────────────────────────────────────
 function applyView() {
   const { scale, rotation } = viewState;
   moonSurface.style.transform = `scale(${scale})`;
-  moonSurface.style.backgroundPosition = `${50 + rotation * 5 / 9}% center`;
+  moonSurface.style.backgroundPosition = `center, center, ${50 + rotation * 5 / 9}% center`;
   zoomLabel.textContent = `${Math.round(scale * 100)}%`;
   renderPOIDots();
 }
@@ -106,38 +123,31 @@ function createPOIDot(poi) {
   dot.title = poi.name;
   const { x, y } = latLonToPercent(poi.lat, poi.lon);
   dot.style.left = `${x}%`;
-  dot.style.top = `${y}%`;
+  dot.style.top  = `${y}%`;
   dot.addEventListener('click', (e) => {
     e.stopPropagation();
     selectedPoiId = poi.id;
-    renderPOIList();
+    openDetailPanel(poi);
+    renderPOIDots();
   });
   moonSurface.appendChild(dot);
 }
 
 function renderPOIDots() {
-  moonSurface.querySelectorAll('.poi-dot').forEach((n) => n.remove());
+  moonSurface.querySelectorAll('.poi-dot').forEach(n => n.remove());
   for (const poi of pois) createPOIDot(poi);
 }
 
-function renderPOIList() {
+// ── Detail panel ──────────────────────────────────────────────────────────────
+function openDetailPanel(poi) {
   poiList.innerHTML = '';
-
-  const poi = pois.find(p => p.id === selectedPoiId);
-
-  if (!poi) {
-    poiList.innerHTML = pois.length
-      ? '<p class="poi-empty">Click a marker on the globe to view details.</p>'
-      : '<p class="poi-empty">No points yet — add your first lunar marker.</p>';
-    renderPOIDots();
-    return;
-  }
 
   const node = template.content.firstElementChild.cloneNode(true);
   node.id = `poi-${poi.id}`;
   node.querySelector('h3').textContent = poi.name;
   node.querySelector('.poi-desc').textContent = poi.description || 'No description';
-  node.querySelector('.poi-coords').textContent = `Lat ${poi.lat.toFixed(1)}°, Lon ${poi.lon.toFixed(1)}°`;
+  node.querySelector('.poi-coords').textContent =
+    `Lat ${poi.lat.toFixed(1)}°, Lon ${poi.lon.toFixed(1)}°`;
 
   const linksWrap = node.querySelector('.poi-links');
   const safeLinks = (poi.links ?? []).filter(l => typeof l === 'string' && /^https?:\/\//i.test(l));
@@ -150,7 +160,9 @@ function renderPOIList() {
       a.rel = 'noreferrer noopener';
       linksWrap.appendChild(a);
     }
-  } else linksWrap.textContent = 'No links attached';
+  } else {
+    linksWrap.textContent = 'No links attached';
+  }
 
   const filesWrap = node.querySelector('.poi-files');
   if (poi.files?.length) {
@@ -168,13 +180,53 @@ function renderPOIList() {
         filesWrap.appendChild(fileLink);
       }
     }
-  } else filesWrap.textContent = 'No files uploaded';
+  } else {
+    filesWrap.textContent = 'No files uploaded';
+  }
 
   poiList.appendChild(node);
+  detailPanel.classList.add('open');
+}
+
+function closeDetailPanel() {
+  detailPanel.classList.remove('open');
+  selectedPoiId = null;
   renderPOIDots();
 }
 
-const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB per file
+panelClose.addEventListener('click', closeDetailPanel);
+
+// ── Add POI modal ─────────────────────────────────────────────────────────────
+function openAddModal(lat, lon) {
+  poiLatInput.value = String(lat);
+  poiLonInput.value = String(lon);
+  modalBackdrop.hidden = false;
+  setTimeout(() => document.getElementById('poiName').focus(), 50);
+}
+
+function closeAddModal() {
+  modalBackdrop.hidden = true;
+  form.reset();
+}
+
+modalClose.addEventListener('click', closeAddModal);
+cancelModal.addEventListener('click', closeAddModal);
+
+// Close modal on backdrop click
+modalBackdrop.addEventListener('click', (e) => {
+  if (e.target === modalBackdrop) closeAddModal();
+});
+
+// Close modal on Escape key
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    if (!modalBackdrop.hidden) closeAddModal();
+    else closeDetailPanel();
+  }
+});
+
+// ── Form submission ───────────────────────────────────────────────────────────
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
 async function filesToPayload(fileList) {
   const payload = [];
@@ -198,25 +250,26 @@ form.addEventListener('submit', async (event) => {
   try {
     const files = await filesToPayload(document.getElementById('poiFiles').files);
     const poi = {
-      id: generateId(),
-      name: document.getElementById('poiName').value.trim(),
+      id:          generateId(),
+      name:        document.getElementById('poiName').value.trim(),
       description: document.getElementById('poiDescription').value.trim(),
-      lat: Number(poiLatInput.value),
-      lon: Number(poiLonInput.value),
-      links: document.getElementById('poiLinks').value.split(',').map((s) => s.trim()).filter(Boolean),
+      lat:         Number(poiLatInput.value),
+      lon:         Number(poiLonInput.value),
+      links:       document.getElementById('poiLinks').value.split(',').map(s => s.trim()).filter(Boolean),
       files
     };
     setStatus('Saving to server...', 'neutral');
     await savePOIToServer(poi);
     pois = await fetchPOIsFromServer();
-    renderPOIList();
-    form.reset();
-    setStatus(`Synced ${pois.length} POIs from server`, 'ok');
+    renderPOIDots();
+    closeAddModal();
+    setStatus('POI submitted — pending review', 'ok');
   } catch (err) {
     setStatus(err.message || 'Failed to save POI to server', 'error');
   }
 });
 
+// ── Globe controls ────────────────────────────────────────────────────────────
 function updateScale(nextScale) {
   viewState.scale = Math.min(3.5, Math.max(0.7, nextScale));
   applyView();
@@ -239,7 +292,8 @@ function animationTick(ts) {
 
 function setSpin(enabled) {
   spinState.enabled = enabled;
-  spinToggleBtn.textContent = enabled ? 'Pause Spin' : 'Resume Spin';
+  spinToggleBtn.textContent = enabled ? '⏸' : '▶';
+  spinToggleBtn.title = enabled ? 'Pause spin' : 'Resume spin';
   if (enabled) {
     spinState.lastTs = 0;
     if (!spinState.rafId) spinState.rafId = requestAnimationFrame(animationTick);
@@ -249,11 +303,11 @@ function setSpin(enabled) {
   }
 }
 
-zoomInBtn.addEventListener('click', () => updateScale(viewState.scale + 0.2));
-zoomOutBtn.addEventListener('click', () => updateScale(viewState.scale - 0.2));
-rotateLeftBtn.addEventListener('click', () => updateRotation(-12));
+zoomInBtn.addEventListener('click',   () => updateScale(viewState.scale + 0.2));
+zoomOutBtn.addEventListener('click',  () => updateScale(viewState.scale - 0.2));
+rotateLeftBtn.addEventListener('click',  () => updateRotation(-12));
 rotateRightBtn.addEventListener('click', () => updateRotation(12));
-spinToggleBtn.addEventListener('click', () => setSpin(!spinState.enabled));
+spinToggleBtn.addEventListener('click',  () => setSpin(!spinState.enabled));
 resetViewBtn.addEventListener('click', () => {
   viewState = { scale: 1, rotation: 0 };
   applyView();
@@ -264,11 +318,24 @@ surfaceShell.addEventListener('wheel', (event) => {
   updateScale(viewState.scale + (event.deltaY < 0 ? 0.1 : -0.1));
 }, { passive: false });
 
+// ── Pointer events (drag + long-press) ───────────────────────────────────────
 surfaceShell.addEventListener('pointerdown', (event) => {
   dragState = { x: event.clientX, y: event.clientY, moved: false };
-  suppressSurfaceClick = false;
+  suppressClick = false;
+
   if (spinState.enabled) setSpin(false);
   surfaceShell.setPointerCapture(event.pointerId);
+
+  // Start long-press timer (only for primary pointer, not right-click)
+  if (event.button === 0) {
+    longPressOrigin = { x: event.clientX, y: event.clientY };
+    longPressTimer = setTimeout(() => {
+      longPressTimer = null;
+      suppressClick = true;
+      const { lat, lon } = clientToLatLon(longPressOrigin.x, longPressOrigin.y);
+      openAddModal(lat, lon);
+    }, 600);
+  }
 });
 
 surfaceShell.addEventListener('pointermove', (event) => {
@@ -277,44 +344,66 @@ surfaceShell.addEventListener('pointermove', (event) => {
   const dy = event.clientY - dragState.y;
   const moved = dragState.moved || Math.abs(dx) > 2 || Math.abs(dy) > 2;
   dragState = { x: event.clientX, y: event.clientY, moved };
-  if (moved) suppressSurfaceClick = true;
+
+  if (moved) {
+    suppressClick = true;
+    // Cancel long-press if the pointer moved significantly
+    const moveX = Math.abs(event.clientX - longPressOrigin.x);
+    const moveY = Math.abs(event.clientY - longPressOrigin.y);
+    if (longPressTimer && (moveX > 8 || moveY > 8)) {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+    }
+  }
+
   updateRotation(dx * 0.35);
 });
 
 surfaceShell.addEventListener('pointerup', () => {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
   dragState = null;
 });
 
-moonSurface.addEventListener('click', (event) => {
-  if (suppressSurfaceClick) {
-    suppressSurfaceClick = false;
-    return;
+surfaceShell.addEventListener('pointercancel', () => {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
   }
-
-  if (spinState.enabled) setSpin(false);
-
-  selectedPoiId = null;
-  renderPOIList();
-
-  const rect = moonSurface.getBoundingClientRect();
-  const x = ((event.clientX - rect.left) / rect.width) * 100;
-  const y = ((event.clientY - rect.top) / rect.height) * 100;
-  const { lat, lon } = percentToLatLon(x, y);
-  poiLatInput.value = String(lat);
-  poiLonInput.value = String(lon);
+  dragState = null;
 });
 
+// ── Right-click to add POI ────────────────────────────────────────────────────
+surfaceShell.addEventListener('contextmenu', (event) => {
+  event.preventDefault();
+  // Don't trigger if the pointer was dragged
+  if (dragState?.moved) return;
+  const { lat, lon } = clientToLatLon(event.clientX, event.clientY);
+  openAddModal(lat, lon);
+});
+
+// ── Surface click (deselect panel on empty-space click) ───────────────────────
+moonSurface.addEventListener('click', () => {
+  if (suppressClick) {
+    suppressClick = false;
+    return;
+  }
+  closeDetailPanel();
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
   applyView();
   setStatus('Loading POIs from server...', 'neutral');
   try {
     pois = await fetchPOIsFromServer();
-    renderPOIList();
-    setStatus(`Synced ${pois.length} POIs from server`, 'ok');
+    renderPOIDots();
+    setStatus(`Synced ${pois.length} approved POI${pois.length !== 1 ? 's' : ''}`, 'ok');
     setSpin(true);
   } catch {
-    setStatus('Unable to load shared POIs from server', 'error');
-    poiList.innerHTML = '<p>Server unavailable. Start server.js to use shared data.</p>';
+    setStatus('Unable to load POIs from server', 'error');
   }
 }
 

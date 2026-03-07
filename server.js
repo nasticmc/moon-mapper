@@ -118,7 +118,9 @@ function safeJoin(root, requestedPath) {
 }
 
 async function handleStatic(req, res) {
-  const requestPath = req.url === '/' ? '/index.html' : req.url;
+  let requestPath = req.url === '/' ? '/index.html'
+    : req.url === '/review' ? '/review.html'
+    : req.url;
   const pathname = requestPath.split('?')[0];
   const filePath = safeJoin(ROOT, pathname);
 
@@ -151,12 +153,21 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    if (req.method === 'GET' && (req.url === '/api/pois' || req.url.startsWith('/api/pois?'))) {
+    // GET /api/pois/pending — unapproved POIs for the review page
+    if (req.method === 'GET' && req.url === '/api/pois/pending') {
       const pois = await readPOIs();
-      sendJson(res, 200, { pois });
+      sendJson(res, 200, { pois: pois.filter(p => p.approved !== true) });
       return;
     }
 
+    // GET /api/pois — approved POIs only (shown on the map)
+    if (req.method === 'GET' && (req.url === '/api/pois' || req.url.startsWith('/api/pois?'))) {
+      const pois = await readPOIs();
+      sendJson(res, 200, { pois: pois.filter(p => p.approved === true) });
+      return;
+    }
+
+    // POST /api/pois — submit a new POI (starts unapproved)
     if (req.method === 'POST' && req.url === '/api/pois') {
       const incoming = await parseRequestBody(req);
       if (!isValidPOI(incoming)) {
@@ -164,10 +175,13 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
+      // Always force approved: false — approval happens via the review page
+      const poi = { ...incoming, approved: false };
+
       const result = await withWriteLock(async () => {
         const pois = await readPOIs();
-        if (pois.some(p => p.id === incoming.id)) return { conflict: true };
-        pois.unshift(incoming);
+        if (pois.some(p => p.id === poi.id)) return { conflict: true };
+        pois.unshift(poi);
         await writePOIs(pois);
         return { pois };
       });
@@ -176,7 +190,47 @@ const server = http.createServer(async (req, res) => {
         sendJson(res, 409, { error: 'A POI with this ID already exists.' });
         return;
       }
-      sendJson(res, 201, { poi: incoming, total: result.pois.length });
+      sendJson(res, 201, { poi, total: result.pois.length });
+      return;
+    }
+
+    // POST /api/pois/:id/approve — approve a pending POI
+    const approveMatch = req.url.match(/^\/api\/pois\/([^/]+)\/approve$/);
+    if (req.method === 'POST' && approveMatch) {
+      const id = decodeURIComponent(approveMatch[1]);
+      const result = await withWriteLock(async () => {
+        const pois = await readPOIs();
+        const idx = pois.findIndex(p => p.id === id);
+        if (idx === -1) return { notFound: true };
+        pois[idx] = { ...pois[idx], approved: true };
+        await writePOIs(pois);
+        return { poi: pois[idx] };
+      });
+      if (result.notFound) {
+        sendJson(res, 404, { error: 'POI not found.' });
+        return;
+      }
+      sendJson(res, 200, { poi: result.poi });
+      return;
+    }
+
+    // DELETE /api/pois/:id — reject / delete a POI
+    const deleteMatch = req.url.match(/^\/api\/pois\/([^/]+)$/);
+    if (req.method === 'DELETE' && deleteMatch) {
+      const id = decodeURIComponent(deleteMatch[1]);
+      const result = await withWriteLock(async () => {
+        const pois = await readPOIs();
+        const idx = pois.findIndex(p => p.id === id);
+        if (idx === -1) return { notFound: true };
+        pois.splice(idx, 1);
+        await writePOIs(pois);
+        return { deleted: true };
+      });
+      if (result.notFound) {
+        sendJson(res, 404, { error: 'POI not found.' });
+        return;
+      }
+      sendJson(res, 200, { deleted: true });
       return;
     }
 
