@@ -69,7 +69,7 @@ body {
     radial-gradient(circle at 76% 78%, rgba(0,0,0,0.2), transparent 45%),
     radial-gradient(circle at 22% 26%, rgba(255,255,255,0.10), transparent 40%),
     url('https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/lroc_color_2k.jpg');
-  background-size: 100% 100%, 100% 100%, auto 100%;
+  background-size: 100% 100%, 100% 100%, auto 200%;
   background-repeat: no-repeat, no-repeat, repeat-x;
   background-position: center, center, 50% center;
 }
